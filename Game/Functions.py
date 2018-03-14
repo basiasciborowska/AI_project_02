@@ -2,14 +2,29 @@ import pygame
 import math
 import numpy
 import random
-import Obstacle as obs
-import Predator as pr
+#import Player as pls
+import Walls as wal
+import Graph as gr
+import GraphNode as gn
+import GraphEdge as ge
 
 def perpendicular(vector):
 	return pygame.math.Vector2(-vector.y, vector.x)
 
+def sign(v1, vector):
+	if v1.y * vector.x > v1.x * vector.y:
+		return -1 # anticlockwise
+	else:
+		return 1 # clockwise
+
 def rotate(matrix, heading):
 	rotation_matrix = ([[heading.x, heading.y, 0], [-heading.y, heading.x, 0], [0, 0, 1]])
+	return numpy.dot(matrix, rotation_matrix)
+
+def rotate_angular(matrix, rot):
+	sin = math.sin(rot)
+	cos = math.cos(rot)
+	rotation_matrix = ([[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]])
 	return numpy.dot(matrix, rotation_matrix)
 
 def translate(matrix, position):
@@ -37,69 +52,23 @@ def vectorToWorldSpace(vector, heading):
 	transformation_matrix = rotate(transformation_matrix, heading)
 	return transformVector(transformation_matrix, vector)
 
-def truncate(force, max_f):
-	if force.x > max_f:
-		force.x = max_f
-	if force.x < -max_f:
-		force.x = -max_f
-	if force.y > max_f:
-		force.y = max_f
-	if force.y < -max_f:
-		force.y = -max_f
-	return force
-
-def walls(position, display, size):
-	if position.x > display[0] - size:
-		position.x = display[0] - size
-	elif position.x < size:
-		position.x = size
-	if position.y > display[1] - size:
-		position.y = display[1] - size
-	elif position.y < size:
-		position.y = size
-	return position 
+def rotateAroundOrigin(v, ang):
+	transformation_matrix = numpy.identity(3)
+	transformation_matrix = rotate_angular(transformation_matrix, ang)
+	return transformVector(transformation_matrix, v)
 
 def distance(point1, point2):
 	return math.sqrt((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2)
 
+def distanceSq(point1, point2):
+	return (point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2
+
 def vectorFromPointToPoint(point1, point2):
 	return pygame.math.Vector2(point2.x - point1.x, point2.y - point1.y)
 
-def addObstacles(no, display):
-	Obstacles = []
-	tmp_display = [display[0] - 140, display[1] - 140]
-
-	sqrt_no = math.sqrt(no)
-
-	iterator_hor = 0
-	iterator_vert = 0
-	hor_interval = int(tmp_display[0]/sqrt_no)
-	vert_interval = int(tmp_display[1]/sqrt_no)
-	for i in range (no):
-		if iterator_hor+1 > sqrt_no:
-			iterator_hor = 0
-			iterator_vert += 1
-		x = random.randint(iterator_hor*hor_interval + 60, iterator_hor*hor_interval + hor_interval - 60)
-		y = random.randint(iterator_vert*vert_interval + 60, iterator_vert*vert_interval + vert_interval - 60)
-		r = random.randrange(30, 50)				# min_r, max_r
-		Obstacles.append(obs.Obstacle(x + 70, y + 70, r))
-		iterator_hor += 1
-	return Obstacles
-
-def addPredators(no, display, obstacles):
-	Predators = []
-
-	for i in range(no):
-		x = random.randint(20, display[0]-20)
-		y = random.randint(20, display[1]-20)
-		Predators.append(pr.Predator(x, y, obstacles, Predators))
-	return Predators
-
-def get_hiding_position(obstacle, enemy_position):
-	distance_from_boundary = 40
-	distance_away = obstacle.radius + distance_from_boundary
-	vector_to_obstacle = (obstacle.position - enemy_position).normalize()
-	return (vector_to_obstacle * distance_away) + obstacle.position #position of hiding spot
+def isSecondInFOVOfFirst(posFirst, facingFirst, posSecond, fov):
+	toTarget = (posSecond - posFirst).normalize()
+	return numpy.dot(facingFirst, toTarget) >= math.cos(fov / 2.0)
 
 def displayMessage(text, display, gameDisplay, x=0.5, y=0.5, fontSize=15, fontStyle=None, update=False):
     x *= display[0]
@@ -110,4 +79,3 @@ def displayMessage(text, display, gameDisplay, x=0.5, y=0.5, fontSize=15, fontSt
     textRect.center = (x, y)
     gameDisplay.blit(textSurf, textRect)
     if update: pygame.display.update()
-
